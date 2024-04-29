@@ -6,6 +6,7 @@
 
 #include "core/task/include/task.hpp"
 
+namespace KostinArtemOMP {
 class ConjugateGradientMethodOMP : public ppc::core::Task {
  public:
   explicit ConjugateGradientMethodOMP(std::shared_ptr<ppc::core::TaskData> taskData_) : Task(std::move(taskData_)) {}
@@ -27,3 +28,4 @@ std::vector<double> generatePDVector(int size, int max_value);
 
 bool check_solution(const std::vector<double>& A, int n, const std::vector<double>& b, const std::vector<double>& x,
                     double tolerance);
+}  // namespace KostinArtemOMP

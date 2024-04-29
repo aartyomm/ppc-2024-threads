@@ -6,6 +6,8 @@
 #include "core/perf/include/perf.hpp"
 #include "omp/kostin_a_sle_conjugate_gradient/include/ops_omp.hpp"
 
+using namespace KostinArtemOMP;
+
 TEST(kostin_a_sle_conjugate_gradient_omp, test_pipeline_run) {
   int size = 360;
 

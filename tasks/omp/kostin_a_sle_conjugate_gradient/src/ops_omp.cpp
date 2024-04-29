@@ -20,7 +20,7 @@ std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, i
 double dot_product(const std::vector<double>& a, const std::vector<double>& b) {
   double result = 0.0;
 #pragma omp parallel for reduction(+ : result)
-  for (int i = 0; i < (int)a.size(); ++i) {
+  for (int i = 0; i < static_cast<int>(a.size()); ++i) {
     result += a[i] * b[i];
   }
   return result;
@@ -38,12 +38,12 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
     double alpha = dot_product(r, r) / dot_product(Ap, p);
 
 #pragma omp parallel for
-    for (int i = 0; i < (int)x.size(); ++i) {
+    for (int i = 0; i < static_cast<int>(x.size()); ++i) {
       x[i] += alpha * p[i];
     }
 
 #pragma omp parallel for
-    for (int i = 0; i < (int)r.size(); ++i) {
+    for (int i = 0; i < static_cast<int>(r.size()); ++i) {
       r[i] = r_prev[i] - alpha * Ap[i];
     }
 
@@ -53,7 +53,7 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
 
     double beta = dot_product(r, r) / dot_product(r_prev, r_prev);
 #pragma omp parallel for
-    for (int i = 0; i < (int)p.size(); ++i) {
+    for (int i = 0; i < static_cast<int>(p.size()); ++i) {
       p[i] = r[i] + beta * p[i];
     }
 

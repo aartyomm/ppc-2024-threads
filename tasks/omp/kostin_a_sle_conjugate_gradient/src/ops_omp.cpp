@@ -38,12 +38,12 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
     double alpha = dot_product(r, r) / dot_product(Ap, p);
 
 #pragma omp parallel for
-    for (int i = 0; (int)i < x.size(); ++i) {
+    for (int i = 0; i < (int)x.size(); ++i) {
       x[i] += alpha * p[i];
     }
 
 #pragma omp parallel for
-    for (int i = 0; (int)i < r.size(); ++i) {
+    for (int i = 0; i < (int)r.size(); ++i) {
       r[i] = r_prev[i] - alpha * Ap[i];
     }
 

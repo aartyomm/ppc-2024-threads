@@ -9,8 +9,9 @@ using namespace std::chrono_literals;
 namespace KostinArtemOMP {
 std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, int n, const std::vector<double>& x) {
   std::vector<double> result(n, 0.0);
-#pragma omp parallel for
+#pragma omp parallel for schedule(static, 1)
   for (int i = 0; i < n; ++i) {
+#pragma omp parallel for
     for (int j = 0; j < n; ++j) {
       result[i] += A[i * n + j] * x[j];
     }

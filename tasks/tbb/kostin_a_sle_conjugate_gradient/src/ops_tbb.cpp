@@ -13,9 +13,15 @@ std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, i
   std::vector<double> result(n, 0.0);
   tbb::parallel_for(tbb::blocked_range<int>(0, n), [&](const tbb::blocked_range<int>& range) {
     for (int i = range.begin(); i != range.end(); ++i) {
-      for (int j = 0; j < n; ++j) {
-        result[i] += A[i * n + j] * x[j];
-      }
+      result[i] = tbb::parallel_reduce(
+          tbb::blocked_range<int>(0, n), 0.0,
+          [&](const tbb::blocked_range<int>& subrange, double local_result) {
+            for (int j = subrange.begin(); j != subrange.end(); ++j) {
+              local_result += A[i * n + j] * x[j];
+            }
+            return local_result;
+          },
+          std::plus<>());
     }
   });
   return result;
@@ -31,7 +37,7 @@ double dot_product(const std::vector<double>& a, const std::vector<double>& b) {
         }
         return local_result;
       },
-      std::plus<double>());
+      std::plus<>());
   return result;
 }
 

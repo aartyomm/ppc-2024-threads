@@ -31,7 +31,7 @@ double dot_product(const std::vector<double>& a, const std::vector<double>& b) {
         }
         return local_result;
       },
-      std::plus<>());
+      std::plus<double>());
   return result;
 }
 

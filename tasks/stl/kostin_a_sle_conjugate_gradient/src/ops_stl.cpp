@@ -10,35 +10,19 @@ using namespace std::chrono_literals;
 namespace KostinArtemSTL {
 std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, int n, const std::vector<double>& x) {
   std::vector<double> result(n, 0.0);
-
-  std::vector<std::future<void>> futures;
   for (int i = 0; i < n; ++i) {
-    futures.emplace_back(std::async(std::launch::async, [&, i]() {
-      for (int j = 0; j < n; ++j) {
-        result[i] += A[i * n + j] * x[j];
-      }
-    }));
+    for (int j = 0; j < n; ++j) {
+      result[i] += A[i * n + j] * x[j];
+    }
   }
-  for (auto& future : futures) {
-    future.wait();
-  }
-
   return result;
 }
 
 double dot_product(const std::vector<double>& a, const std::vector<double>& b) {
   double result = 0.0;
-
-  std::vector<std::future<double>> futures;
   for (size_t i = 0; i < a.size(); ++i) {
-    futures.emplace_back(std::async(std::launch::async, [&, i]() {
-      return a[i] * b[i];
-    }));
+    result += a[i] * b[i];
   }
-  for (auto& future : futures) {
-    result += future.get();
-  }
-
   return result;
 }
 
@@ -50,35 +34,43 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
   std::vector<double> r_prev = b;
 
   while (true) {
-    std::vector<double> Ap = dense_matrix_vector_multiply(A, n, p);
-    double alpha = dot_product(r, r) / dot_product(Ap, p);
+    auto Ap_future = std::async(std::launch::async, dense_matrix_vector_multiply, A, n, p);
+    auto r_dot_r_future = std::async(std::launch::async, dot_product, r, r);
+    std::vector<double> Ap = Ap_future.get();
+    auto Ap_dot_p_future = std::async(std::launch::async, dot_product, Ap, p);
+    auto r_prev_dot_r_prev_future = std::async(std::launch::async, dot_product, r_prev, r_prev);
 
-    std::vector<std::future<void>> futures;
-    for (int i = 0; i < n; ++i) {
-      futures.emplace_back(std::async(std::launch::async, [&, i]() {
+    double alpha = r_dot_r_future.get() / Ap_dot_p_future.get();
+
+    auto update_x_future = std::async(std::launch::async, [&x, &p, alpha] {
+      for (size_t i = 0; i < x.size(); ++i) {
         x[i] += alpha * p[i];
+      }
+    });
+    auto update_r_future = std::async(std::launch::async, [&r, &r_prev, &Ap, alpha] {
+      for (size_t i = 0; i < r.size(); ++i) {
         r[i] = r_prev[i] - alpha * Ap[i];
-      }));
-    }
-    for (auto& future : futures) {
-      future.wait();
-    }
+      }
+    });
+    update_r_future.wait();
 
-    if (sqrt(dot_product(r, r)) < tolerance) {
+    auto r_dot_r_future_2 = std::async(std::launch::async, dot_product, r, r);
+    double r_dot_r = r_dot_r_future_2.get();
+
+    update_x_future.wait();
+
+    if (sqrt(r_dot_r) < tolerance) {
       break;
     }
 
-    double beta = dot_product(r, r) / dot_product(r_prev, r_prev);
+    double beta = r_dot_r / r_prev_dot_r_prev_future.get();
 
-    std::vector<std::future<void>> futures_p;
-    for (int i = 0; i < n; ++i) {
-      futures_p.emplace_back(std::async(std::launch::async, [&, i]() {
+    auto update_p_future = std::async(std::launch::async, [&p, &r, beta] {
+      for (size_t i = 0; i < p.size(); ++i) {
         p[i] = r[i] + beta * p[i];
-      }));
-    }
-    for (auto& future : futures_p) {
-      future.wait();
-    }
+      }
+    });
+    update_p_future.wait();
 
     r_prev = r;
   }

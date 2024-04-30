@@ -1,9 +1,9 @@
 // Copyright 2024 Kostin Artem
 #include "stl/kostin_a_sle_conjugate_gradient/include/ops_stl.hpp"
 
+#include <future>
 #include <random>
 #include <thread>
-#include <future>
 
 using namespace std::chrono_literals;
 

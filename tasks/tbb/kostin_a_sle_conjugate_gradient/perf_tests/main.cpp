@@ -9,7 +9,7 @@
 using namespace KostinArtemTBB;
 
 TEST(kostin_a_sle_conjugate_gradient_tbb, test_pipeline_run) {
-  int size = 360;
+  int size = 640;
 
   // Create data
   std::vector<double> in_A = generateSPDMatrix(size, 100);
@@ -50,7 +50,7 @@ TEST(kostin_a_sle_conjugate_gradient_tbb, test_pipeline_run) {
 }
 
 TEST(kostin_a_sle_conjugate_gradient_tbb, test_task_run) {
-  int size = 360;
+  int size = 640;
 
   // Create data
   std::vector<double> in_A = generateSPDMatrix(size, 100);

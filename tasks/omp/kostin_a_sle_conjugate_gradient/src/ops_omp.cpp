@@ -1,37 +1,29 @@
 // Copyright 2024 Kostin Artem
-#include "tbb/kostin_a_sle_conjugate_gradient/include/ops_tbb.hpp"
-
-#include <tbb/tbb.h>
+#include "omp/kostin_a_sle_conjugate_gradient/include/ops_omp.hpp"
 
 #include <random>
 #include <thread>
 
 using namespace std::chrono_literals;
 
-namespace KostinArtemTBB {
+namespace KostinArtemOMP {
 std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, int n, const std::vector<double>& x) {
   std::vector<double> result(n, 0.0);
-  tbb::parallel_for(tbb::blocked_range<int>(0, n), [&](const tbb::blocked_range<int>& range) {
-    for (int i = range.begin(); i != range.end(); ++i) {
-      for (int j = 0; j < n; ++j) {
-        result[i] += A[i * n + j] * x[j];
-      }
+#pragma omp parallel for
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      result[i] += A[i * n + j] * x[j];
     }
-  });
+  }
   return result;
 }
 
 double dot_product(const std::vector<double>& a, const std::vector<double>& b) {
   double result = 0.0;
-  result = tbb::parallel_reduce(
-      tbb::blocked_range<size_t>(0, a.size()), 0.0,
-      [&](const tbb::blocked_range<size_t>& range, double local_result) {
-        for (size_t i = range.begin(); i != range.end(); ++i) {
-          local_result += a[i] * b[i];
-        }
-        return local_result;
-      },
-      std::plus<>());
+#pragma omp parallel for reduction(+ : result)
+  for (int i = 0; i < static_cast<int>(a.size()); ++i) {
+    result += a[i] * b[i];
+  }
   return result;
 }
 
@@ -46,28 +38,25 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
     std::vector<double> Ap = dense_matrix_vector_multiply(A, n, p);
     double alpha = dot_product(r, r) / dot_product(Ap, p);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, x.size()), [&](const tbb::blocked_range<size_t>& range) {
-      for (size_t i = range.begin(); i != range.end(); ++i) {
-        x[i] += alpha * p[i];
-      }
-    });
+#pragma omp parallel for
+    for (int i = 0; i < static_cast<int>(x.size()); ++i) {
+      x[i] += alpha * p[i];
+    }
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, r.size()), [&](const tbb::blocked_range<size_t>& range) {
-      for (size_t i = range.begin(); i != range.end(); ++i) {
-        r[i] = r_prev[i] - alpha * Ap[i];
-      }
-    });
+#pragma omp parallel for
+    for (int i = 0; i < static_cast<int>(r.size()); ++i) {
+      r[i] = r_prev[i] - alpha * Ap[i];
+    }
 
     if (sqrt(dot_product(r, r)) < tolerance) {
       break;
     }
 
     double beta = dot_product(r, r) / dot_product(r_prev, r_prev);
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, p.size()), [&](const tbb::blocked_range<size_t>& range) {
-      for (size_t i = range.begin(); i != range.end(); ++i) {
-        p[i] = r[i] + beta * p[i];
-      }
-    });
+#pragma omp parallel for
+    for (int i = 0; i < static_cast<int>(p.size()); ++i) {
+      p[i] = r[i] + beta * p[i];
+    }
 
     r_prev = r;
   }
@@ -113,7 +102,7 @@ bool check_solution(const std::vector<double>& A, int n, const std::vector<doubl
   return true;
 }
 
-bool ConjugateGradientMethodTBB::pre_processing() {
+bool ConjugateGradientMethodOMP::pre_processing() {
   internal_order_test();
   // Init value for input and output
   A = std::vector<double>(taskData->inputs_count[0]);
@@ -135,24 +124,24 @@ bool ConjugateGradientMethodTBB::pre_processing() {
   return true;
 }
 
-bool ConjugateGradientMethodTBB::validation() {
+bool ConjugateGradientMethodOMP::validation() {
   internal_order_test();
   // Check count elements of output
   return taskData->inputs_count[0] == taskData->inputs_count[1] * taskData->inputs_count[1] &&
          taskData->inputs_count[1] == taskData->outputs_count[0];
 }
 
-bool ConjugateGradientMethodTBB::run() {
+bool ConjugateGradientMethodOMP::run() {
   internal_order_test();
   x = conjugate_gradient(A, size, b, 1e-6);
   return true;
 }
 
-bool ConjugateGradientMethodTBB::post_processing() {
+bool ConjugateGradientMethodOMP::post_processing() {
   internal_order_test();
   for (size_t i = 0; i < x.size(); i++) {
     reinterpret_cast<double*>(taskData->outputs[0])[i] = x[i];
   }
   return true;
 }
-}  // namespace KostinArtemTBB
+}  // namespace KostinArtemOMP

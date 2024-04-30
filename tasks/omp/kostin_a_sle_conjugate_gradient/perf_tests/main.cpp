@@ -9,7 +9,7 @@
 using namespace KostinArtemOMP;
 
 TEST(kostin_a_sle_conjugate_gradient_omp, test_pipeline_run) {
-  int size = 484;
+  int size = 529;
 
   // Create data
   std::vector<double> in_A = generateSPDMatrix(size, 100);
@@ -50,7 +50,7 @@ TEST(kostin_a_sle_conjugate_gradient_omp, test_pipeline_run) {
 }
 
 TEST(kostin_a_sle_conjugate_gradient_omp, test_task_run) {
-  int size = 484;
+  int size = 529;
 
   // Create data
   std::vector<double> in_A = generateSPDMatrix(size, 100);

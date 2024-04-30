@@ -7,7 +7,7 @@
 #include "seq/kostin_a_sle_conjugate_gradient/include/ops_seq.hpp"
 
 TEST(kostin_a_sle_conjugate_gradient_seq, test_pipeline_run) {
-  int size = 560;
+  int size = 590;
 
   // Create data
   std::vector<double> in_A = generateSPDMatrix(size, 100);
@@ -48,7 +48,7 @@ TEST(kostin_a_sle_conjugate_gradient_seq, test_pipeline_run) {
 }
 
 TEST(kostin_a_sle_conjugate_gradient_seq, test_task_run) {
-  int size = 560;
+  int size = 590;
 
   // Create data
   std::vector<double> in_A = generateSPDMatrix(size, 100);

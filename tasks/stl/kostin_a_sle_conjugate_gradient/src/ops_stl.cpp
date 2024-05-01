@@ -32,10 +32,25 @@ std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, i
 }
 
 double dot_product(const std::vector<double>& a, const std::vector<double>& b) {
-  double result = 0.0;
-  for (size_t i = 0; i < a.size(); ++i) {
-    result += a[i] * b[i];
+  std::atomic<double> result = 0.0;
+
+  const auto num_threads = std::thread::hardware_concurrency();
+  std::vector<std::future<void>> futures(num_threads);
+  int chunk_size = a.size() / num_threads;
+
+  for (unsigned int thr_ind = 0; thr_ind < num_threads; ++thr_ind) {
+    int start = thr_ind * chunk_size;
+    int end = (thr_ind == num_threads - 1) ? a.size() : (thr_ind + 1) * chunk_size;
+    futures[thr_ind] = std::async(std::launch::async, [&, start, end]() {
+      double local_result = 0.0;
+      for (int i = start; i < end; ++i) {
+        local_result += a[i] * b[i];
+      }
+      result += local_result;
+    });
   }
+  for (auto& f : futures) f.get();
+
   return result;
 }
 

@@ -10,48 +10,31 @@ using namespace std::chrono_literals;
 namespace KostinArtemSTL {
 std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, int n, const std::vector<double>& x) {
   std::vector<double> result(n, 0.0);
-
-  const auto num_threads = std::thread::hardware_concurrency();
-  std::vector<std::future<void>> futures(num_threads);
-  int chunk_size = n / num_threads;
-
-  for (unsigned int thr_ind = 0; thr_ind < num_threads; ++thr_ind) {
-    int start = thr_ind * chunk_size;
-    int end = (thr_ind == num_threads - 1) ? n : (thr_ind + 1) * chunk_size;
-    futures[thr_ind] = std::async(std::launch::async, [&, start, end]() {
-      for (int i = start; i < end; ++i) {
-        for (int j = 0; j < n; ++j) {
-          result[i] += A[i * n + j] * x[j];
-        }
-      }
-    });
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      result[i] += A[i * n + j] * x[j];
+    }
   }
-  for (auto& f : futures) f.get();
-
   return result;
 }
 
-double dot_product(const std::vector<double>& a, const std::vector<double>& b) {
-  std::atomic<double> result = 0.0;
-
-  const auto num_threads = std::thread::hardware_concurrency();
-  std::vector<std::future<void>> futures(num_threads);
-  int chunk_size = a.size() / num_threads;
-
-  for (unsigned int thr_ind = 0; thr_ind < num_threads; ++thr_ind) {
-    int start = thr_ind * chunk_size;
-    int end = (thr_ind == num_threads - 1) ? a.size() : (thr_ind + 1) * chunk_size;
-    futures[thr_ind] = std::async(std::launch::async, [&, start, end]() {
-      double local_result = 0.0;
-      for (int i = start; i < end; ++i) {
-        local_result += a[i] * b[i];
-      }
-      result += local_result;
-    });
+double dot_product_recursive(const std::vector<double>& a, const std::vector<double>& b, size_t start, size_t end, double result) {
+  auto len = end - start;
+  if (len < 10) {
+    for(int i = start; i < end; ++i){
+      result += a[i] * b[i];
+    }
+    return result;
   }
-  for (auto& f : futures) f.get();
+  size_t mid = start + len / 2;
+  auto handle = std::async(std::launch::async,dot_product_recursive, a, b, mid, end, result);
+  double sum1 = dot_product_recursive(a, b, start, mid, result);
+  return sum1 + handle.get();
+}
 
-  return result;
+double dot_product(const std::vector<double>& a, const std::vector<double>& b) {
+  double result = 0.0;
+  return dot_product_recursive(a, b, 0, a.size(), result);
 }
 
 std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, const std::vector<double>& b,
@@ -62,40 +45,22 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
   std::vector<double> r_prev = b;
 
   while (true) {
-    // 1st parallel section
-    double Ap_dot_p;
     std::vector<double> Ap = dense_matrix_vector_multiply(A, n, p);
-    auto update_future =
-        std::async(std::launch::async, [&A, &n, &p, &Ap, &Ap_dot_p] { Ap_dot_p = dot_product(Ap, p); });
-    double r_dot_r = dot_product(r, r);
-    update_future.wait();
-    double alpha = r_dot_r / Ap_dot_p;
-    // end of 1st parallel section
+    double alpha = dot_product(r, r) / dot_product(Ap, p);
 
-    // 2nd parallel section
-    auto update_r_future = std::async(std::launch::async, [&r, &r_prev, &Ap, alpha] {
-      for (size_t i = 0; i < r.size(); ++i) {
-        r[i] = r_prev[i] - alpha * Ap[i];
-      }
-    });
     for (size_t i = 0; i < x.size(); ++i) {
       x[i] += alpha * p[i];
     }
-    update_r_future.wait();
-    // end of 2nd parallel section
 
-    // 3rd parallel section
-    auto r_dot_r_future_2 = std::async(std::launch::async, dot_product, r, r);
-    double r_prev_dot_prev_r = dot_product(r_prev, r_prev);
-    double r_dot_r_2 = r_dot_r_future_2.get();
+    for (size_t i = 0; i < r.size(); ++i) {
+      r[i] = r_prev[i] - alpha * Ap[i];
+    }
 
-    if (sqrt(r_dot_r_2) < tolerance) {
+    if (sqrt(dot_product(r, r)) < tolerance) {
       break;
     }
 
-    double beta = r_dot_r_2 / r_prev_dot_prev_r;
-    // end of 3rd parallel section
-
+    double beta = dot_product(r, r) / dot_product(r_prev, r_prev);
     for (size_t i = 0; i < p.size(); ++i) {
       p[i] = r[i] + beta * p[i];
     }

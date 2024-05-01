@@ -10,23 +10,23 @@ using namespace std::chrono_literals;
 namespace KostinArtemSTL {
 std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, int n, const std::vector<double>& x) {
   std::vector<double> result(n, 0.0);
-  std::vector<std::future<void>> futures(4);
 
-  int chunk_size = n / 4;
-  for (int i = 0; i < 4; ++i) {
-    int start = i * chunk_size;
-    int end = (i == 3) ? n : (i + 1) * chunk_size;
-    futures[i] = std::async(std::launch::async, [&, start, end]() {
-      for (int j = start; j < end; ++j) {
-        for (int k = 0; k < n; ++k) {
-          result[j] += A[j * n + k] * x[k];
+  const auto num_threads = std::thread::hardware_concurrency();
+  std::vector<std::future<void>> futures(num_threads);
+  int chunk_size = n / num_threads;
+
+  for (unsigned int thr_ind = 0; thr_ind < num_threads; ++thr_ind) {
+    int start = thr_ind * chunk_size;
+    int end = (thr_ind == num_threads - 1) ? n : (thr_ind + 1) * chunk_size;
+    futures[thr_ind] = std::async(std::launch::async, [&, start, end]() {
+      for (int i = start; i < end; ++i) {
+        for (int j = 0; j < n; ++j) {
+          result[i] += A[i * n + j] * x[j];
         }
       }
     });
   }
-  for (auto& f : futures) {
-    f.get();
-  }
+  for (auto& f : futures) f.get();
 
   return result;
 }
@@ -49,11 +49,9 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
   while (true) {
     // 1st parallel section
     double Ap_dot_p;
-    std::vector<double> Ap;
-    Ap = dense_matrix_vector_multiply(A, n, p);
-    auto update_future = std::async(std::launch::async, [&A, &n, &p, &Ap, &Ap_dot_p] {
-      Ap_dot_p = dot_product(Ap, p);
-    });
+    std::vector<double> Ap = dense_matrix_vector_multiply(A, n, p);
+    auto update_future =
+        std::async(std::launch::async, [&A, &n, &p, &Ap, &Ap_dot_p] { Ap_dot_p = dot_product(Ap, p); });
     double r_dot_r = dot_product(r, r);
     update_future.wait();
     double alpha = r_dot_r / Ap_dot_p;

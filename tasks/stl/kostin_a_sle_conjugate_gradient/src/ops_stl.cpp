@@ -10,11 +10,24 @@ using namespace std::chrono_literals;
 namespace KostinArtemSTL {
 std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, int n, const std::vector<double>& x) {
   std::vector<double> result(n, 0.0);
-  for (int i = 0; i < n; ++i) {
-    for (int j = 0; j < n; ++j) {
-      result[i] += A[i * n + j] * x[j];
-    }
+  std::vector<std::future<void>> futures(4);
+
+  int chunk_size = n / 4;
+  for (int i = 0; i < 4; ++i) {
+    int start = i * chunk_size;
+    int end = (i == 3) ? n : (i + 1) * chunk_size;
+    futures[i] = std::async(std::launch::async, [&, start, end]() {
+      for (int j = start; j < end; ++j) {
+        for (int k = 0; k < n; ++k) {
+          result[j] += A[j * n + k] * x[k];
+        }
+      }
+    });
   }
+  for (auto& f : futures) {
+    f.get();
+  }
+
   return result;
 }
 
@@ -37,8 +50,8 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
     // 1st parallel section
     double Ap_dot_p;
     std::vector<double> Ap;
+    Ap = dense_matrix_vector_multiply(A, n, p);
     auto update_future = std::async(std::launch::async, [&A, &n, &p, &Ap, &Ap_dot_p] {
-      Ap = dense_matrix_vector_multiply(A, n, p);
       Ap_dot_p = dot_product(Ap, p);
     });
     double r_dot_r = dot_product(r, r);

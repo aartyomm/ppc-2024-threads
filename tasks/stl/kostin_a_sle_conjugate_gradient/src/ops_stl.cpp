@@ -47,15 +47,25 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
     // end of 1st parallel section
 
     // 2nd parallel section
-    auto update_r_future = std::async(std::launch::async, [&r, &r_prev, &Ap, alpha] {
-      for (size_t i = 0; i < r.size(); ++i) {
-        r[i] = r_prev[i] - alpha * Ap[i];
-      }
-    });
+
+    std::vector<std::future<void>> futures;
+    size_t chunk_size = r.size() / 4;
+    for (size_t i = 0; i < 4; ++i) {
+      size_t start = i * chunk_size;
+      size_t end = (i == 3) ? r.size() : (i + 1) * chunk_size;
+      futures.emplace_back(std::async(std::launch::async, [&r, &r_prev, &Ap, alpha, start, end] {
+        for (size_t i = start; i < end; ++i) {
+          r[i] = r_prev[i] - alpha * Ap[i];
+        }
+    }));
+    }
+    for (auto& future : futures) {
+      future.wait();
+    }
+
     for (size_t i = 0; i < x.size(); ++i) {
       x[i] += alpha * p[i];
     }
-    update_r_future.wait();
     // end of 2nd parallel section
 
     // 3rd parallel section

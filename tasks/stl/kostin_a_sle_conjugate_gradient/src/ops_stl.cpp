@@ -34,43 +34,30 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
   std::vector<double> r_prev = b;
 
   while (true) {
-    auto Ap_future = std::async(std::launch::async, dense_matrix_vector_multiply, A, n, p);
+    std::vector<double> Ap = dense_matrix_vector_multiply(A, n, p);
+    double alpha = dot_product(r, r) / dot_product(Ap, p);
+
+
+    for (size_t i = 0; i < r.size(); ++i) {
+      r[i] = r_prev[i] - alpha * Ap[i];
+    }
+
     auto r_dot_r_future = std::async(std::launch::async, dot_product, r, r);
-    std::vector<double> Ap = Ap_future.get();
-    auto Ap_dot_p_future = std::async(std::launch::async, dot_product, Ap, p);
-    auto r_prev_dot_r_prev_future = std::async(std::launch::async, dot_product, r_prev, r_prev);
 
-    double alpha = r_dot_r_future.get() / Ap_dot_p_future.get();
+    for (size_t i = 0; i < x.size(); ++i) {
+      x[i] += alpha * p[i];
+    }
 
-    auto update_x_future = std::async(std::launch::async, [&x, &p, alpha] {
-      for (size_t i = 0; i < x.size(); ++i) {
-        x[i] += alpha * p[i];
-      }
-    });
-    auto update_r_future = std::async(std::launch::async, [&r, &r_prev, &Ap, alpha] {
-      for (size_t i = 0; i < r.size(); ++i) {
-        r[i] = r_prev[i] - alpha * Ap[i];
-      }
-    });
-    update_r_future.wait();
-
-    auto r_dot_r_future_2 = std::async(std::launch::async, dot_product, r, r);
-    double r_dot_r = r_dot_r_future_2.get();
-
-    update_x_future.wait();
+    double r_dot_r = r_dot_r_future.get();
 
     if (sqrt(r_dot_r) < tolerance) {
       break;
     }
 
-    double beta = r_dot_r / r_prev_dot_r_prev_future.get();
-
-    auto update_p_future = std::async(std::launch::async, [&p, &r, beta] {
-      for (size_t i = 0; i < p.size(); ++i) {
-        p[i] = r[i] + beta * p[i];
-      }
-    });
-    update_p_future.wait();
+    double beta = r_dot_r / dot_product(r_prev, r_prev);
+    for (size_t i = 0; i < p.size(); ++i) {
+      p[i] = r[i] + beta * p[i];
+    }
 
     r_prev = r;
   }

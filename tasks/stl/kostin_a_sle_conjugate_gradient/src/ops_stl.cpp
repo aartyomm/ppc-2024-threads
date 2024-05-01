@@ -34,32 +34,41 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
   std::vector<double> r_prev = b;
 
   while (true) {
-    std::vector<double> Ap = dense_matrix_vector_multiply(A, n, p);
-    double alpha = dot_product(r, r) / dot_product(Ap, p);
+    double Ap_dot_p;
+    std::vector<double> Ap;
+    auto update_future = std::async(std::launch::async, [&A, &n, &p, &Ap, &Ap_dot_p] {
+      Ap = dense_matrix_vector_multiply(A, n, p);
+      Ap_dot_p = dot_product(Ap, p);
+    });
+    double r_dot_r = dot_product(r, r);
+    update_future.wait();
+    double alpha = r_dot_r / Ap_dot_p;
 
-
-    for (size_t i = 0; i < r.size(); ++i) {
-      r[i] = r_prev[i] - alpha * Ap[i];
-    }
-
-    auto r_dot_r_future = std::async(std::launch::async, dot_product, r, r);
-
+    auto update_r_future = std::async(std::launch::async, [&r, &r_prev, &Ap, alpha] {
+      for (size_t i = 0; i < r.size(); ++i) {
+        r[i] = r_prev[i] - alpha * Ap[i];
+      }
+    });
     for (size_t i = 0; i < x.size(); ++i) {
       x[i] += alpha * p[i];
     }
+    update_r_future.wait();
 
-    double r_dot_r = r_dot_r_future.get();
 
-    if (sqrt(r_dot_r) < tolerance) {
-      break;
-    }
+    auto r_dot_r_future_2 = std::async(std::launch::async, dot_product, r, r);
+    double r_prev_dot_prev_r = dot_product(r_prev, r_prev);
+    double r_dot_r_2 = r_dot_r_future_2.get();
+    double beta = r_dot_r_2 / r_prev_dot_prev_r;
 
-    double beta = r_dot_r / dot_product(r_prev, r_prev);
     for (size_t i = 0; i < p.size(); ++i) {
       p[i] = r[i] + beta * p[i];
     }
 
     r_prev = r;
+
+    if (sqrt(r_dot_r_2) < tolerance) {
+      break;
+    }
   }
 
   return x;

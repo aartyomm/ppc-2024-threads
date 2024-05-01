@@ -18,23 +18,12 @@ std::vector<double> dense_matrix_vector_multiply(const std::vector<double>& A, i
   return result;
 }
 
-double dot_product_recursive(const std::vector<double>& a, const std::vector<double>& b, size_t start, size_t end, double result) {
-  auto len = end - start;
-  if (len < 10) {
-    for(int i = start; i < end; ++i){
-      result += a[i] * b[i];
-    }
-    return result;
-  }
-  size_t mid = start + len / 2;
-  auto handle = std::async(std::launch::async,dot_product_recursive, a, b, mid, end, result);
-  double sum1 = dot_product_recursive(a, b, start, mid, result);
-  return sum1 + handle.get();
-}
-
 double dot_product(const std::vector<double>& a, const std::vector<double>& b) {
   double result = 0.0;
-  return dot_product_recursive(a, b, 0, a.size(), result);
+  for (size_t i = 0; i < a.size(); ++i) {
+    result += a[i] * b[i];
+  }
+  return result;
 }
 
 std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, const std::vector<double>& b,
@@ -45,22 +34,41 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
   std::vector<double> r_prev = b;
 
   while (true) {
-    std::vector<double> Ap = dense_matrix_vector_multiply(A, n, p);
-    double alpha = dot_product(r, r) / dot_product(Ap, p);
+    // 1st
+    double Ap_dot_p;
+    std::vector<double> Ap;
+    auto update_future = std::async(std::launch::async, [&A, &n, &p, &Ap, &Ap_dot_p] {
+      Ap = dense_matrix_vector_multiply(A, n, p);
+      Ap_dot_p = dot_product(Ap, p);
+    });
+    double r_dot_r = dot_product(r, r);
+    update_future.wait();
+    double alpha = r_dot_r / Ap_dot_p;
+    // end of 1st
 
+    // 2nd
+    auto update_r_future = std::async(std::launch::async, [&r, &r_prev, &Ap, alpha] {
+      for (size_t i = 0; i < r.size(); ++i) {
+        r[i] = r_prev[i] - alpha * Ap[i];
+      }
+    });
     for (size_t i = 0; i < x.size(); ++i) {
       x[i] += alpha * p[i];
     }
+    update_r_future.wait();
+    // end of 2nd
 
-    for (size_t i = 0; i < r.size(); ++i) {
-      r[i] = r_prev[i] - alpha * Ap[i];
-    }
+    // 3rd
+    auto r_dot_r_future_2 = std::async(std::launch::async, dot_product, r, r);
+    double r_prev_dot_prev_r = dot_product(r_prev, r_prev);
+    double r_dot_r_2 = r_dot_r_future_2.get();
+    // end of 3rd
 
-    if (sqrt(dot_product(r, r)) < tolerance) {
+    if (sqrt(r_dot_r_2) < tolerance) {
       break;
     }
+    double beta = r_dot_r_2 / r_prev_dot_prev_r;
 
-    double beta = dot_product(r, r) / dot_product(r_prev, r_prev);
     for (size_t i = 0; i < p.size(); ++i) {
       p[i] = r[i] + beta * p[i];
     }

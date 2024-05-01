@@ -34,6 +34,7 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
   std::vector<double> r_prev = b;
 
   while (true) {
+    // 1st parallel section
     double Ap_dot_p;
     std::vector<double> Ap;
     auto update_future = std::async(std::launch::async, [&A, &n, &p, &Ap, &Ap_dot_p] {
@@ -43,7 +44,9 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
     double r_dot_r = dot_product(r, r);
     update_future.wait();
     double alpha = r_dot_r / Ap_dot_p;
+    // end of 1st parallel section
 
+    // 2nd parallel section
     auto update_r_future = std::async(std::launch::async, [&r, &r_prev, &Ap, alpha] {
       for (size_t i = 0; i < r.size(); ++i) {
         r[i] = r_prev[i] - alpha * Ap[i];
@@ -53,22 +56,25 @@ std::vector<double> conjugate_gradient(const std::vector<double>& A, int n, cons
       x[i] += alpha * p[i];
     }
     update_r_future.wait();
+    // end of 2nd parallel section
 
-
+    // 3rd parallel section
     auto r_dot_r_future_2 = std::async(std::launch::async, dot_product, r, r);
     double r_prev_dot_prev_r = dot_product(r_prev, r_prev);
     double r_dot_r_2 = r_dot_r_future_2.get();
+
+    if (sqrt(r_dot_r_2) < tolerance) {
+      break;
+    }
+
     double beta = r_dot_r_2 / r_prev_dot_prev_r;
+    //end of 3rd parallel section
 
     for (size_t i = 0; i < p.size(); ++i) {
       p[i] = r[i] + beta * p[i];
     }
 
     r_prev = r;
-
-    if (sqrt(r_dot_r_2) < tolerance) {
-      break;
-    }
   }
 
   return x;
